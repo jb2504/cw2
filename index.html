@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<br>
+
+    <title>World Map</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://d3js.org/d3-geo-projection.v2.min.js"></script>
+    <script src="https://unpkg.com/topojson-client@3"></script>
+
+    <style>
+         .positive-bar {
+            fill: darkgreen;
+        }
+
+        .negative-bar {
+            fill: darkred;
+        }
+
+        button {
+            margin: 5px;
+            font-size: 14px;
+            padding: 5px 10px;
+            background-color: lightsteelblue;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: steelblue;
+            color: white;
+        }
+
+        .tooltip {
+            position: absolute;
+            text-align: center;
+            padding: 5px;
+            font: 12px sans-serif;
+            background: lightsteelblue;
+            border: 1px solid steelblue;
+            border-radius: 8px;
+            pointer-events: none;
+            opacity: 0;
+            
+        }
+        
+
+        .axis text {
+            font: 12px sans-serif;
+        }
+
+        .axis path,
+        .axis line {
+            fill: none;
+            stroke: white;
+            shape-rendering: crispEdges;
+        }
+
+        body {
+            background-color: black;
+        }
+
+        svg text {
+            fill: white;
+        }
+
+        .tooltip1 {
+            position: absolute;
+            text-align: center;
+            padding: 5px;
+            font: 12px sans-serif;
+            background: rgba(70, 70, 70, 0.9);
+            border: 0px;
+            border-radius: 8px;
+            pointer-events: none;
+        }
+
+  path {
+    stroke: white;
+    stroke-width: 0.8px;
+  }
+
+  #gradient-bar {
+    fill: url(#gradient);
+  }
+  circle {
+        opacity: 0.7;
+      }
+      .circle {
+  fill: steelblue;
+  opacity: 0.8;
+}
+      h1
+      {
+text-align: center;
+      }
+      .hidden {
+      display: none;
+    }
+
+    .dot {
+      fill: steelblue;
+    }
+    .dot.brushed {
+  fill: red;
+}
+
+    .brush .selection {
+      stroke: #333;
+      stroke-width: 1.5px;
+      fill-opacity: 0.15;
+    }
+ 
+    #bargraph .bar {
+  fill: steelblue;
+}
+.bar.female {
+      fill: orange;
+    }
+    .bar.male {
+      fill: steelblue;
+    }
+.lineTest {
+  fill: none;
+  stroke: white;
+  stroke-width: 1.5px;
+}
+ h2
+ {
+  color: yellow;
+ }
+
+h1
+{
+  color: yellowgreen;
+}
+
+
+
+</style>
+</head>
+
+<h1>Suicide Dashboard</h1>
+
+<br></br>
+<h2>Worldwide Suicides per 100K Population</h2>
+<input type="text" id="country-search" placeholder="Search for a country" />
+<button onclick="searchCountry()">Search</button>
+<br />
+<svg width="600" height="300"></svg>
+</br>
+</br>
+<svg id="legend" width="600" height="40"></svg> 
+<div id="tooltip" style="visibility: hidden; position: absolute;"></div>
+
+<br></br>
+
+<h2> Click the Button to view Positive and Negative Facet</h2>
+<button id="show-positive">Positive Facet</button>
+<button id="show-negative">Negative Facet</button>
+<svg id="chart6"></svg>
+<div class="tooltip"></div>
+<h2>Suicides by Generations</h2>
+<svg id="doughnut"></svg>
+<br></br>
+<h2>Suicides by Gender and Year</h2>
+<svg id="barChart" width="800" height="300"></svg>
+<br></br>
+
+
+<h2>Suicides by Age</h2>
+<div id="chart"></div>
+<br></br>
+
+<h2>Suicides over Time</h2>
+<select id="selection">
+</select>
+<br>
+<svg id="lineChart"></svg> 
+<br></br>
+
+<h2>Suicides By Unemployment Rate over Countries</h2>
+<svg id="chart1" width="600" height="400"></svg>
+<svg id="bargraph" width="600" height="400"></svg>
+
+<br></br>
+<h2>Suicides over Years</h2>
+<div id="chart3"></div>
+<br></br>
+
+
+
+
+    <script>
+      const svg = d3.select("svg");
+      const width = +svg.attr("width");
+      const height = +svg.attr("height");
+
+      const colorScale = d3.scaleSequential(d3.interpolateBlues).domain([0, 1]);
+
+      const projection = d3
+        .geoMercator()
+        .scale(60)
+        .translate([width / 2, height / 1.5]);
+
+      const path = d3.geoPath().projection(projection);
+      const zoom = d3.zoom()
+        .scaleExtent([1, 8])
+        .on("zoom", (event) => {
+          svg.selectAll("path").attr("transform", event.transform);
+        });
+
+      const legendSvg = d3.select("#legend");
+      const gradient = legendSvg.append("defs")
+        .append("linearGradient")
+        .attr("id", "gradient")
+        .attr("x1", "0%")
+        .attr("y1", "100%")
+        .attr("x2", "100%")
+        .attr("y2", "100%")
+        .attr("spreadMethod", "pad");
+
+      gradient.append("stop")
+        .attr("offset", "0%")
+        .attr("stop-color", colorScale(0))
+        .attr("stop-opacity", 1);
+
+      gradient.append("stop")
+        .attr("offset", "100%")
+        .attr("stop-color", colorScale(1))
+        .attr("stop-opacity", 1);
+
+      legendSvg.append("rect")
+        .attr("width", 300)
+        .attr("height", 20)
+        .style("fill", "url(#gradient)");
+
+      const legendScale = d3.scaleLinear()
+        .domain([0, 100])
+        .range([0, 300]);
+
+      const legendAxis = d3.axisBottom(legendScale)
+        .ticks(4);
+
+      legendSvg.append("g")
+        .attr("transform", "translate(0,20)")
+        .call(legendAxis);
+
+      const legendLabels = legendSvg.selectAll(".tick text").attr("fill", (d) => colorScale(d));
+
+      legendLabels.attr("fill", (d) => colorScale(d / 50));
+
+      svg.call(zoom);
+
+      d3.json(
+        "https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson"
+      ).then(function (data) {
+        d3.csv(
+            "https://raw.githubusercontent.com/bazilmk/suicide-analysis-dashboard/main/merged_suicide_rates_dataset.csv"
+        ).then(function (csvData) {
+          const latestData = d3.rollup(
+            csvData,
+            (v) => ({
+              suicides_no: +v[0].suicides_no,
+              population: +v[0].population,
+            }),
+            (d) => d.country
+          );
+
+          data.features.forEach((d) => {
+            const countryData = latestData.get(d.properties.name);
+
+            try {
+              if (countryData && countryData.suicides_no && countryData.population) {
+                d.properties.suicides_per_100k = countryData.suicides_no / countryData.population * 100000;
+              } else {
+                d.properties.suicides_per_100k = 0;
+              }
+            } catch (error) {
+              console.error(`Error calculating suicides_per_100k for ${d.properties.name}: ${error}`);
+              d.properties.suicides_per_100k = 0;
+            }
+          });
+
+          svg.selectAll("path")
+            .data(data.features)
+            .enter()
+            .append("path")
+            .attr("d", path)
+            .attr("fill", (d) => colorScale(d.properties.suicides_per_100k / 50))
+            .attr("data-name", (d) => d.properties.name)
+            .on("mouseover", function (event, d) {
+         d3.select(this).style("opacity", 0.5);
+         d3.select("#tooltip")
+           .style("color", "red")
+           .style("visibility", "visible")
+           .style("left", event.pageX + "px")
+          .style("top", event.pageY - 28 + "px")
+          .text(`${d.properties.name}: ${d.properties.suicides_per_100k.toFixed(2)} suicides per 100k`);
+         })
+
+           .on("mouseout", function() {
+              d3.select(this).style("opacity", 1);
+              d3.select("#tooltip").style("visibility", "hidden");
+            });
+
+          function searchCountry() {
+            const countryName = document.getElementById("country-search").value;
+            const country = data.features.find(
+              (d) => d.properties.name.toLowerCase() === countryName.toLowerCase()
+            );
+
+            if (country) {
+              const bounds = path.bounds(country);
+              const dx = bounds[1][0] - bounds[0][0];
+              const dy = bounds[1][1] - bounds[0][1];
+              const x = (bounds[0][0] + bounds[1][0]) / 2;
+              const y = (bounds[0][1] + bounds[1][1]) / 2;
+              const scale = Math.max(1, Math.min(8, 0.9 / Math.max(dx / width, dy / height)));
+              const translate = [width / 2 - scale * x, height / 2 - scale * y];
+
+              svg.transition()
+                .duration(750)
+                .call(zoom.transform, d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale));
+            } else {
+              alert("Country not found. Please try again.");
+            }
+          }
+
+          window.searchCountry = searchCountry;
+        });
+      });
+      </script>
+      <script>
+        const csvUrl = 'https://raw.githubusercontent.com/bazilmk/suicide-analysis-dashboard/main/merged_suicide_rates_dataset.csv';
+
+d3.csv(csvUrl).then(data => {
+  const genders = ['male', 'female'];
+
+  const nestedData = d3.rollup(data, v => d3.mean(v, d => +d['suicides/100k pop']), d => d.year, d => d.sex);
+
+  const svg = d3.select('#barChart');
+  const margin = { top: 20, right: 80, bottom: 30, left: 50 };
+  const width = +svg.attr('width') - margin.left - margin.right;
+  const height = +svg.attr('height') - margin.top - margin.bottom;
+
+  const x0 = d3.scaleBand()
+    .domain(Array.from(nestedData.keys()))
+    .rangeRound([0, width])
+    .paddingInner(0.1);
+
+  const x1 = d3.scaleBand()
+    .domain(genders)
+    .rangeRound([0, x0.bandwidth()])
+    .padding(0.05);
+
+  const y = d3.scaleLinear()
+    .domain([0, 30])
+    .range([height, 0]);
+
+  const color = d3.scaleOrdinal()
+    .domain(genders)
+    .range(['steelblue', 'orange']);
+
+  const chart = svg.append('g')
+    .attr('transform', `translate(${margin.left}, ${margin.top})`);
+
+  chart.append('g')
+    .attr('transform', `translate(0, ${height})`)
+    .call(d3.axisBottom(x0).tickFormat(d3.format('d')));
+
+  chart.append('g')
+    .call(d3.axisLeft(y));
+
+  const yearGroup = chart.selectAll('.yearGroup')
+    .data(Array.from(nestedData))
+    .join('g')
+    .attr('class', 'yearGroup')
+    .attr('transform', d => `translate(${x0(d[0])}, 0)`);
+
+  for (const gender of genders) {
+    yearGroup.selectAll(`.${gender}Bar`)
+      .data(([year, sexMap]) => [{ year, gender, mean: sexMap.get(gender) || 0 }])
+      .join('rect')
+      .attr('class', d => `${gender}Bar bar`)
+      .attr('x', d => x1(d.gender))
+      .attr('y', height)
+      .attr('width', x1.bandwidth())
+      .attr('height', 0)
+      .attr('fill', color(gender))
+      .transition()
+      .duration(1000)
+      .delay((d, i) => i * 100)
+      .attr('y', d => y(d.mean))
+      .attr('height', d => height - y(d.mean));
+  }
+
+  svg.append('text')
+    .attr('x', width / 2 + margin.left)
+    .attr('y', margin.top / 2)
+.attr('text-anchor', 'middle')
+
+svg.append('text')
+.attr('x', width / 2 + margin.left)
+.attr('y', height + margin.top + 30)
+.attr('text-anchor', 'middle')
+.text('Year');
+
+svg.append('text')
+.attr('transform', 'rotate(-90)')
+.attr('x', -(height / 2 + margin.top))
+.attr('y', margin.left / 2)
+.attr('text-anchor', 'middle')
+.text('Suicides per 100k Population');
+
+const legend = svg.selectAll('.legend')
+.data(genders)
+.join('g')
+.attr('class', 'legend')
+.attr('transform', (d, i) => `translate(${width - margin.right + 20}, ${margin.top + 20 * i})`);
+
+legend.append('rect')
+.attr('width', 18)
+.attr('height', 18)
+.style('fill', color);
+
+legend.append('text')
+.attr('x', 24)
+.attr('y', 9)
+.attr('dy', '.35em')
+.text(d => d);
+}).catch(error => {
+console.error("Error fetching or processing data:", error);
+});
+</script>
+
+
+
+<script>
+  // Load the suicide rates dataset
+  d3.csv(
+    "https://raw.githubusercontent.com/bazilmk/suicide-analysis-dashboard/main/merged_suicide_rates_dataset.csv"
+  ).then((data) => {
+
+    const groupedData = Array.from(
+      d3.rollup(
+        data,
+        (v) => d3.sum(v, (d) => d.suicides_no),
+        (d) => d.age
+      ),
+      ([age, suicides_no]) => ({ age, suicides_no })
+    );
+
+    
+    const width = 500;
+    const height = 500;
+    const margin = 10;
+
+  
+    const pack = d3
+      .pack()
+      .size([width - 2 * margin, height - 2 * margin])
+      .padding(3);
+
+   
+    const root = d3
+      .hierarchy({ children: groupedData })
+      .sum((d) => d.suicides_no);
+    pack(root);
+
+    // Create the SVG element
+    const svg = d3
+      .select("#chart")
+      .append("svg")
+      .attr("width", width)
+      .attr("height", height);
+
+    // Create a color scale
+    const color = d3.scaleOrdinal(d3.schemeCategory10);
+
+    // Draw the circles with animation
+    const node = svg
+      .selectAll("circle")
+      .data(root.leaves())
+      .enter()
+      .append("circle")
+      .attr("cx", (d) => d.x + margin)
+      .attr("cy", (d) => d.y + margin)
+      .attr("r", 0) //radius to 0 for animation
+      .attr("fill", (d) => color(d.data.age))
+      .transition() 
+      .duration(2000) 
+      .attr("r", (d) => d.r); 
+
+    // Add labels
+    const label = svg
+      .selectAll("text")
+      .data(root.leaves())
+      .enter()
+      .append("text")
+      .attr("x", (d) => d.x + margin)
+      .attr("y", (d) => d.y + margin)
+      .attr("text-anchor", "middle")
+      .attr("dy", "0.3em")
+      .text((d) => d.data.age);
+  });
+</script>
+<script>
+  // Define the URL 
+  const Url1 = 'https://raw.githubusercontent.com/bazilmk/suicide-analysis-dashboard/main/merged_suicide_rates_dataset.csv';
+
+  // Fetch and process the data
+  d3.csv(Url1).then(data => {
+    
+    const countryData = d3.rollups(
+      data,
+      v => ({
+        meanSuicideRate: d3.mean(v, d => +d['suicides/100k pop']),
+        meanUnemploymentRate: d3.mean(v, d => +d['total_unemployment_rate'])
+      }),
+      d => d.country
+    ).map(([country, { meanSuicideRate, meanUnemploymentRate }]) => ({ country, meanSuicideRate, meanUnemploymentRate }));
+    const topCountriesData = countryData.sort((a, b) => b.meanSuicideRate - a.meanSuicideRate).slice(0, 35);
+
+    // Define SVG 
+    const svg = d3.select('#chart1');
+    const bargraph = d3.select('#bargraph');
+    const margin = { top: 20, right: 20, bottom: 100, left: 60 };
+    const width = +svg.attr('width') - margin.left - margin.right;
+    const height = +svg.attr('height') - margin.top - margin.bottom;
+
+    const x = d3.scaleLinear()
+      .domain(d3.extent(countryData, d => d.meanUnemploymentRate))
+      .range([0, width]);
+
+    const y = d3.scaleLinear()
+      .domain([0, d3.max(countryData, d => d.meanSuicideRate)])
+      .range([height, 0]);
+
+    
+    const chart1 = svg.append('g')
+      .attr('transform', `translate(${margin.left}, ${margin.top})`);
+      function addMouseHover() {
+dots.append('title')
+  .text(d => `Country: ${d.country}\nMean Suicides per 100k Population: ${d.meanSuicideRate.toFixed(2)}\nMean Unemployment Rate: ${d.meanUnemploymentRate.toFixed(2)}`);
+}
+
+const dots = chart1.selectAll('.dot')
+.data(countryData)
+.join('circle')
+.attr('class', 'dot')
+.attr('cx', d => x(d.meanUnemploymentRate))
+.attr('cy', d => y(d.meanSuicideRate))
+.attr('r', 3);
+
+addMouseHover();
+
+
+    
+          chart1.append('g')
+      .attr('transform', `translate(0, ${height})`)
+      .call(d3.axisBottom(x));
+
+    chart1.append('g')
+      .call(d3.axisLeft(y));
+
+    // Add axis labels 
+    svg.append('text')
+      .attr('x', width / 2 + margin.left)
+      .attr('y', margin.top / 2)
+      .attr('text-anchor', 'middle')
+      .text('Suicide Cases by Unemployment Rate');
+
+    svg.append('text')
+      .attr('x', width / 2 + margin.left)
+      .attr('y', height + margin.top + 40)
+      .attr('text-anchor', 'middle')
+      .text('Mean Unemployment Rate');
+
+    svg.append('text')
+      .attr('transform', 'rotate(-90)')
+      .attr('x', -(height / 2 + margin.top))
+      .attr('y', margin.left / 2)
+      .attr('text-anchor', 'middle')
+      .text('Mean Suicides per 100k Population');
+
+    // Create scales for the bar graph
+    const xBar = d3.scaleBand()
+      .domain(topCountriesData.map(d => d.country))
+      .range([0, width])
+      .padding(0.1);
+
+    const yBar = d3.scaleLinear()
+      .domain([0, d3.max(countryData, d => d.meanSuicideRate)])
+      .range([height, 0]);
+
+    // Create the bar graph area
+    const barArea = bargraph.append('g')
+      .attr('transform', `translate(${margin.left}, ${margin.top})`);
+
+    // Draw the bars in the bar graph
+    barArea.selectAll('.bar')
+      .data(topCountriesData)
+      .join('rect')
+      .attr('class', 'bar')
+      .attr('x', d => xBar(d.country))
+      .attr('y', d => yBar(d.meanSuicideRate))
+      .attr('width', xBar.bandwidth())
+      .attr('height', d => height - yBar(d.meanSuicideRate));
+
+    // Add x and y axes to the bar graph
+    barArea.append('g')
+      .attr('transform', `translate(0, ${height})`)
+      .call(d3.axisBottom(xBar))
+      .selectAll('text')
+      .attr('transform', 'rotate(-90)')
+      .attr('text-anchor', 'end')
+      .attr('x', -10)
+      .attr('y', -6)
+      .attr('dy', '.5em');
+
+    barArea.append('g')
+      .call(d3.axisLeft(yBar));
+
+    // Brush function
+    const brush = d3.brush()
+      .extent([[0, 0], [width, height]])
+      .on('brush', brushed)
+      .on('end', brushended);
+
+    chart1.append('g')
+      .attr('class', 'brush')
+      .call(brush);
+
+      function brushed({ selection }) {
+if (selection) {
+  const [[x0, y0], [x1, y1]] = selection;
+  dots.classed('brushed', d => x0 <= x(d.meanUnemploymentRate) && x(d.meanUnemploymentRate) <= x1 && y0 <= y(d.meanSuicideRate) && y(d.meanSuicideRate) <= y1);
+  barArea.selectAll('.bar').classed('hidden', d => x0 > x(d.meanUnemploymentRate) || x(d.meanUnemploymentRate) > x1 || y0 > y(d.meanSuicideRate) || y(d.meanSuicideRate) > y1);
+}
+}
+
+
+function brushended({ selection }) {
+if (!selection) {
+  dots.classed('brushed', false);
+  barArea.selectAll('.bar').classed('hidden', false);
+}
+}
+
+
+function updateBarGraph(data) {
+  // Update the xBar scale domain
+  xBar.domain(data.map(d => d.country));
+
+  // Update the bars
+  const bars = barArea.selectAll('.bar')
+    .data(data, d => d.country);
+
+  bars.enter().append('rect')
+    .attr('class', 'bar')
+    .attr('x', d => xBar(d.country))
+    .attr('y', d => yBar(d.meanSuicideRate))
+    .attr('width', xBar.bandwidth())
+    .attr('height', d => height - yBar(d.meanSuicideRate));
+
+  bars.transition()
+    .duration(750)
+    .attr('x', d => xBar(d.country))
+    .attr('y', d => yBar(d.meanSuicideRate))
+    .attr('width', xBar.bandwidth())
+    .attr('height', d => height - yBar(d.meanSuicideRate));
+
+  bars.exit()
+    .transition()
+    .duration(750)
+    .attr('height', 0)
+    .remove();
+}
+
+
+
+// Initialize the bar graph with the topCountriesData
+updateBarGraph(topCountriesData);
+
+}).catch(error => {
+console.error("Error fetching or processing data:", error);
+});
+</script>
+<script>
+  var Url = 'https://raw.githubusercontent.com/bazilmk/suicide-analysis-dashboard/main/merged_suicide_rates_dataset.csv';
+  
+  d3.csv(Url).then(function(data) {
+    var ageGroups = Array.from(new Set(data.map(function(d) { return d.age; })));
+    var select = d3.select("#selection");
+    ageGroups.forEach(function(ageGroup) {
+      select.append("option")
+        .attr("value", ageGroup)
+        .text(ageGroup);
+    });
+  
+    init(data);
+  }).catch(function(error) {
+    console.error("Error fetching data:", error);
+  });
+  
+  function init(data) {
+  
+    var margin1, x, y, valueline, div, svg, xAxis, yAxis;
+  
+    var selectedYears = ['1995', '2005', '2015'];
+    var parsedData = Array.from(d3.group(data, d => d.age, d => d.year)).map(([key, values]) => ({ key, values }));
+  
+      
+    // set the dimensions and margin1s of the graph
+    margin1 = {top: 20, right: 20, bottom: 20, left: 25},
+    width1 = 860 - margin1.left - margin1.right,
+    height1 = 400 - margin1.top - margin1.bottom;
+  
+    // set the ranges
+    x = d3.scalePoint().range([0,width1]);
+    y = d3.scaleLinear().range([height1, 0]);
+  
+    xAxis = d3.axisBottom().scale(x);
+    yAxis = d3.axisLeft().scale(y);
+  
+    valueline = d3.line()
+        .curve(d3.curveCardinal)
+        .x(function(d) { return x(d.year); })
+        .y(function(d) { return y(d.mean); });
+  
+    // Define the div for the tooltip
+    div = d3.select("body").append("div")   
+        .attr("class", "tooltip")               
+        .style("opacity", 0);       
+  
+ 
+    svg = d3.select("svg#lineChart")
+        .attr("width", width1 + margin1.left + margin1.right)
+        .attr("height", height1 + margin1.top + margin1.bottom)
+      .append("g")
+        .attr("transform",
+              "translate(" + margin1.left + "," + margin1.top + ")");
+  
+    svg.append("g")
+      .attr("transform", "translate(0," + height1 + ")")
+      .attr("class","axis axis--x");
+  
+      svg.append("g")
+      .attr("class","axis axis--y");
+
+    var durations = 0;
+  
+    var afterLoad = () => durations = 750;
+  
+    d3.select("#selection").on("change", update);
+  
+    update();
+  
+    function update() {
+  
+      var selectedAgeGroup = d3.select('#selection').property('value')
+      var ageGroupData = d3.group(data.filter(d => d.age === selectedAgeGroup), d => d.year);
+  
+      var processedData = selectedYears.map(function(year) {
+        return {
+          year: year,
+          mean: d3.mean(ageGroupData.get(year), d => d['suicides/100k pop'])
+        };
+      });
+  
+      // Scale the range of the data
+      x.domain(selectedYears);
+  
+      y.domain([0, d3.max(processedData, function(d) { 
+        return d.mean; 
+      }) + 2]).nice();
+  
+      // Call the X axis
+      svg.selectAll(".axis.axis--x").transition()
+        .duration(durations)
+        .call(xAxis);
+  
+      // Call the Y axis
+      svg.selectAll(".axis.axis--y").transition()
+        .duration(durations)
+        .call(yAxis);
+  
+      var line = svg.selectAll(".lineTest")
+        .data([processedData], function(d) { return d.year; });
+  
+      line = line
+        .enter()
+        .append("path")
+        .attr("class", "lineTest")
+        .merge(line);
+  
+      line.transition()
+        .duration(durations)
+        .attr("d", valueline);
+    }
+  
+    afterLoad();
+  }
+  
+  </script>
+  <script>
+    // set the dimensions and margin2s of the graph
+    var margin2 = {top: 40, right: 30, bottom: 50, left: 60},
+        width2 = 460 - margin2.left - margin2.right,
+        height2 = 400 - margin2.top - margin2.bottom;
+    
+   
+    var svg1 = d3.select("#chart3")
+      .append("svg")
+        .attr("width", width2 + margin2.left + margin2.right)
+        .attr("height", height2 + margin2.top + margin2.bottom)
+        .style("background", "black") 
+      .append("g")
+        .attr("transform",
+              "translate(" + margin2.left + "," + margin2.top + ")");
+    
+    // Add tooltip div
+    var tooltip = d3.select("body").append("div")
+      .attr("class", "tooltip")
+      .style("opacity", 0)
+      .style("background", "white")
+      .style("padding", "5px")
+      .style("border-radius", "5px")
+      .style("position", "absolute")
+      .style("pointer-events", "none");
+    
+    // Function to calculate the median
+    function median(arr) {
+      arr.sort((a, b) => a - b);
+      const mid = Math.floor(arr.length / 2);
+      return (arr.length % 2 !== 0) ? arr[mid] : (arr[mid - 1] + arr[mid]) / 2;
+    }
+    
+    // Read the data
+    d3.csv("https://raw.githubusercontent.com/bazilmk/suicide-analysis-dashboard/main/merged_suicide_rates_dataset.csv",
+      // When reading the csv, I must format variables:
+      function(d){
+        return { year : +d.year, suicides : +d.suicides_no }
+      }).then(function(data) {
+        // Filter out data for years greater than 2015
+        data = data.filter(function(d) { return d.year <= 2016; });
+    
+        // Group data by year and calculate median suicides per year
+        var groupedData = Array.from(d3.group(data, d => d.year), ([key, values]) => ({
+          key: key,
+          value: median(values.map(d => d.suicides))
+        }));
+    
+       
+        groupedData.sort((a, b) => a.key - b.key);
+    
+        
+        var x = d3.scaleLinear()
+          .domain(d3.extent(groupedData, function(d) { return d.key; }))
+          .range([ 0, width2 ]);
+        svg1.append("g")
+          .attr("transform", "translate(0," + height2 + ")")
+          .call(d3.axisBottom(x).tickFormat(d3.format("d")))
+          .attr("stroke", "white"); 
+    
+        // Add Y axis
+        var y = d3.scaleLinear()
+          .domain(d3.extent(groupedData, function(d) { return d.value; }))
+          .range([ height2, 0 ]);
+        svg1.append("g")
+        .call(d3.axisLeft(y))
+          .attr("stroke", "white"); 
+        // Add the line
+        svg1.append("path")
+          .datum(groupedData)
+          .attr("fill", "none")
+          .attr("stroke", "#69b3a2")
+          .attr("stroke-width", 1.5)
+          .attr("d", d3.line()
+            .curve(d3.curveMonotoneX)
+            .x(function(d) { return x(d.key) })
+            .y(function(d) { return y(d.value) })
+          )
+    
+        
+        svg1
+          .append("g")
+          .selectAll("dot")
+          .data(groupedData)
+          .join("circle")
+            .attr("cx", function(d) { return x(d.key) } )
+            .attr("cy", function(d) { return y(d.value) } )
+            .attr("r", 5)
+            .attr("fill", "#69b3a2")
+            .on("mouseover", function(event, d) { 
+              tooltip.transition()
+                .duration(200)
+                .style("opacity", 1);
+              tooltip.html("Year: " + d.key + "<br>Median Suicides: " + d.value)
+                .style("left", (event.pageX + 15) + "px")
+                .style("top", (event.pageY - 28) + "px");
+            })
+            .on("mouseout", function() { 
+              tooltip.transition()
+                .duration(500)
+                .style("opacity", 0);
+            });
+    
+        // Add X axis label
+        svg1.append("text")
+            .attr("transform", "translate(" + (width2 / 2) + "," + (height2 + margin2.bottom - 10) + ")")
+            .style("text-anchor", "middle")
+            .style("fill", "white") 
+            .text("Year");
+    
+        // Add Y axis label
+        svg1.append("text")
+            .attr("transform", "rotate(-90)")
+            .attr("y", 0 - margin2.left)
+            .attr("x", 0 - (height2 / 2))
+            .attr("dy", "1em")
+            .style("text-anchor", "middle")
+            .style("fill", "white") 
+            .text("Median Suicides");
+    
+        
+        svg1.append("text")
+            .attr("x", (width2 / 2))
+            .attr("y", 0 - (margin2.top / 2))
+            .attr("text-anchor", "middle")
+            .style("font-size", "16px")
+            .style("font-weight", "bold")
+            .style("fill", "white") // Change text color to white
+            .text("Annual Median Suicide Rates");
+    })
+          
+
+
+</script>
+
+ <script>
+  // Bar chart code
+  const url = 'https://raw.githubusercontent.com/bazilmk/suicide-analysis-dashboard/main/merged_suicide_rates_dataset.csv';
+
+  d3.csv(url).then(function (data) {
+      processData(data);
+  }).catch(function (error) {
+      console.error("Error fetching data:", error);
+  });
+
+  function processData(data) {
+      const groupedData = d3.group(data, d => d.country);
+      const aggregatedData = Array.from(groupedData, ([country, values]) => {
+          const avgSuicides = d3.mean(values, d => +d['suicides/100k pop']);
+          return { country, avgSuicides };
+      });
+      const top10LowestSuicides = aggregatedData.sort((a, b) => a.avgSuicides - b.avgSuicides).slice(0, 10);
+      const top10HighestSuicides = aggregatedData.sort((a, b) => b.avgSuicides - a.avgSuicides).slice(0, 10);
+
+      d3.select("#show-positive").on("click", () => drawBarchart6(top10LowestSuicides, 'positive-bar', 'Top 10 Countries with Lowest Average Suicide Rates'));
+      d3.select("#show-negative").on("click", () => drawBarchart6(top10HighestSuicides, 'negative-bar', 'Top 10 Countries with Highest Average Suicide Rates'));
+  }
+  function drawBarchart6(data, barClass, title) {
+  d3.select("#chart6").html("");
+
+  const margin6 = { top: 20, right: 20, bottom: 80, left: 80 },
+      width6 = 800 - margin6.left - margin6.right,
+      height6 = 400 - margin6.top - margin6.bottom;
+
+  const x = d3.scaleBand()
+      .range([0, width6])
+      .padding(0.1);
+  const y = d3.scaleLinear()
+      .range([height6, 0]);
+
+  const svg = d3.select("#chart6")
+      .attr("width", width6 + margin6.left + margin6.right)
+      .attr("height", height6 + margin6.top + margin6.bottom)
+      .append("g")
+      .attr("transform", "translate(" + margin6.left + "," + margin6.top + ")");
+
+  x.domain(data.map(d => d.country));
+  y.domain([0, d3.max(data, d => d.avgSuicides)]);
+
+  const tooltip = d3.select(".tooltip");
+
+  svg.selectAll(".bar")
+      .data(data)
+      .enter().append("rect")
+      .attr("class", barClass)
+      .attr("x", d => x(d.country))
+      .attr("width", x.bandwidth())
+      .attr("y", d => y(d.avgSuicides))
+      .attr("height", d => height6 - y(d.avgSuicides))
+      .on("mouseover", (event, d) => {
+          tooltip.style("opacity", 0.9);
+          tooltip.html("Country: " + d.country + "<br>Avg. Suicide Rate: " + d.avgSuicides.toFixed(2))
+              .style("left", (event.pageX + 15) + "px")
+              .style("top", (event.pageY - 15) + "px");
+      })
+      .on("mouseout", () => {
+          tooltip.style("opacity", 0);
+      });
+
+  svg.append("g")
+      .attr("transform", "translate(0," + height6 + ")")
+      .call(d3.axisBottom(x))
+      .selectAll("text")
+      .style("text-anchor", "end")
+      .attr("dx", "-.8em")
+      .attr("dy", "-.55em")
+      .attr("transform", "rotate(-90)");
+
+  svg.append("g")
+      .call(d3.axisLeft(y));
+
+  svg.append("text")
+      .attr("x", width6 / 2)
+      .attr("y", -margin6.top)
+      .attr("dy", "1em")
+      .style("text-anchor", "middle")
+      .style("font-size", "16px")
+      .text(title);
+}
+
+// Doughnut chart code
+const generationYears = {
+  'G.I. Generation': '1900 - 1927',
+  'Silent': '1928 - 1945',
+  'Boomers': '1946 - 1964',
+  'Generation X': '1965 - 1980',
+  'Millenials': '1981 - 1996',
+  'Generation Z': '1997 - 2012'
+};
+
+d3.csv(url).then(function (data) {
+  processDataDoughnut(data);
+}).catch(function (error) {
+  console.error("Error fetching data:", error);
+});
+
+function processDataDoughnut(data) {
+  const generationData = d3.rollups(
+      data,
+      v => d3.sum(v, d => d.suicides_no),d => d.generation).map(([generation, count]) => ({ generation, count }));
+
+  drawDoughnutChart(generationData);
+}
+
+function drawDoughnutChart(data) {
+  const width7 = 400;
+  const height7 = 400;
+  const radius = Math.min(width7, height7) / 2;
+  const color = d3.scaleOrdinal(d3.schemeCategory10);
+
+  const svg = d3.select("#doughnut")
+      .attr("width", width7)
+      .attr("height", height7)
+      .append("g")
+      .attr("transform", "translate(" + width7 / 2 + "," + height7 / 2 + ")");
+
+  const pie = d3.pie()
+      .value(d => d.count)
+      .sort(null);
+
+  const arc = d3.arc()
+      .innerRadius(radius - 80)
+      .outerRadius(radius - 20);
+
+  const tooltip1 = d3.select("body").append("div")
+      .attr("class", "tooltip1")
+      .style("opacity", 0);
+
+  const g = svg.selectAll(".arc")
+      .data(pie(data))
+      .enter().append("g")
+      .attr("class", "arc");
+
+  g.append("path")
+      .attr("d", arc)
+      .style("fill", (d, i) => color(i))
+      .transition()
+      .duration(1000)
+      .attrTween("d", tweenPie);
+
+  g.on("mouseover", (event, d) => {
+      tooltip1.transition()
+          .duration(200)
+          .style("opacity", .9);
+      tooltip1.html(d.data.generation + " (" + generationYears[d.data.generation] + "): " + ((d.data.count / d3.sum(data, d => d.count)) * 100).toFixed(2) + "%")
+          .style("left", (event.pageX) + "px")
+          .style("top", (event.pageY - 28) + "px");
+  })
+      .on("mouseout", () => {
+          tooltip1.transition()
+              .duration(500)
+              .style("opacity", 0);
+      });
+
+  function tweenPie(b) {
+      b.innerRadius = 0;
+      const i = d3.interpolate({ startAngle: 0, endAngle: 0 }, b);
+      return function (t) { return arc(i(t)); };
+  }
+}
+
+
+</script>
+</body>
+</html>
+
